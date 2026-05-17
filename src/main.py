@@ -1,11 +1,46 @@
 import sys
 import os
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+import platform
 from lexer import Lexer
 from parser import Parser
 from semantic import SemanticAnalyzer
 from codegen import LLVMCodeGenerator
 from visualizer import ASTPrinter 
 from errors import CompilerError, LexerError, ParserError, SemanticError
+
+
+def _native_object_extension():
+    return ".obj" if platform.system() == "Windows" else ".o"
+
+
+def _lib_io_shared_library_path():
+    """Path to the native CSV helper next to this file; name depends on OS."""
+    base = os.path.dirname(os.path.abspath(__file__))
+    system = platform.system()
+    if system == "Windows":
+        name = "lib_io.dll"
+    elif system == "Darwin":
+        name = "lib_io.dylib"
+    else:
+        name = "lib_io.so"
+    return os.path.join(base, name)
+
+
+def _try_load_lib_io():
+    """Load lib_io for load_csv; warn if missing (programs without load_csv still run)."""
+    import llvmlite.binding as llvm
+
+    path = _lib_io_shared_library_path()
+    if not os.path.isfile(path):
+        print(
+            "\n[Notice] Native lib_io not found (expected at "
+            f"{path}). Programs using load_csv need it; build with "
+            "`make -f Makefile.lib_io lib_io` from the project root.\n"
+        )
+        return
+    llvm.load_library_permanently(path)
+
 
 def main():
     if len(sys.argv) < 2:
@@ -25,7 +60,7 @@ def main():
 
     
 
-    # 1. Lexer
+    
     print("1. Lexing...")
     try:
         lexer = Lexer(source_code)
@@ -34,13 +69,13 @@ def main():
         print(f"[Lexer Error] {e}")
         sys.exit(1)
 
-    # 2. Parser
+    
     print("2. Parsing...")
     
     parser = Parser(tokens)
     ast = parser.parse()
 
-    # ERROR CHECK 
+    
     if parser.errors:
         print("\n--- PARSER ERRORS ---")
         for err in parser.errors:
@@ -56,7 +91,7 @@ def main():
     printer.print_node(ast)
     print("----------------------------------\n")
 
-    # 3. Semantic Analysis
+    
     print("3. Semantic Analysis...")
     try:
         analyzer = SemanticAnalyzer()
@@ -71,7 +106,7 @@ def main():
         sys.exit(1)
 
 
-    # 4. Code Generation
+    
     print("4. Generating LLVM IR...")
     try:
         codegen = LLVMCodeGenerator()
@@ -84,23 +119,19 @@ def main():
 
     
     #test too
-    # 5. Execution and Compilation
+    
     try:
-        
-        import llvmlite.binding as llvm
-        
-        dll_path = os.path.join(os.path.dirname(__file__), "lib_io.dll")
-        llvm.load_library_permanently(dll_path)
-        
+        _try_load_lib_io()
+
         codegen.execute()
         
 
-        # create the 'obj' folder 
+        
         os.makedirs("obj", exist_ok=True) 
         
         base_name = os.path.splitext(os.path.basename(file_path))[0]
         
-        obj_path = os.path.join("obj", f"{base_name}.obj")
+        obj_path = os.path.join("obj", f"{base_name}{_native_object_extension()}")
         
         codegen.save_object(obj_path)
 
