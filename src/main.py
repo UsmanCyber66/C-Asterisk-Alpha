@@ -12,7 +12,7 @@ from errors import CompilerError, LexerError, ParserError, SemanticError
 
 
 def _native_object_extension():
-    return ".obj" if platform.system() == "Windows" else ".o"
+    return ".ll"
 
 
 def _lib_io_shared_library_path():
@@ -149,8 +149,8 @@ def main():
             
             
             try:
-                subprocess.run(["clang", obj_path, "-o", exe_path], check=True)
-                print(f"\n✅ Build Success! Standalone executable created at: {exe_path}")
+                subprocess.run(["clang", obj_path, "src/lib_io.c", "-o", exe_path], check=True)
+                print(f"\nBuild Success! Standalone executable created at: {exe_path}")
                 print(f"You can now run it directly: .\\{exe_path}")
             except Exception as e:
                 print(f"\n[Linker Error] Make sure you have a C compiler (clang or gcc) installed on your system.")

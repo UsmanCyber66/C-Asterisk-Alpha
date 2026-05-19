@@ -1,7 +1,7 @@
 import llvmlite.ir as ir
 import llvmlite.binding as llvm
 import re
-
+import platform
 from tokens import TokenType
 from parser import (
     Program, Function, Print, Number, BinaryOp,
@@ -17,7 +17,7 @@ class LLVMCodeGenerator:
         llvm.initialize_native_asmprinter()
 
         self.module = ir.Module(name="cstar_module")
-        self.module.triple = llvm.get_default_triple()
+        self.module.triple = "x86_64-pc-windows-msvc" if platform.system() == "Windows" else llvm.get_default_triple()
 
         self.builder = None
         self.variables = {}
@@ -697,20 +697,11 @@ class LLVMCodeGenerator:
     #testing something 
 
     def save_object(self, filename):
-        """Compiles the LLVM IR down to a native Object File (.obj / .o)."""
-        
+        """Saves the LLVM IR to a text file so Clang can compile it directly."""
         llvm_ir = str(self.module)
         llvm_ir = self._enable_fast_math(llvm_ir)
-        mod = llvm.parse_assembly(llvm_ir)
-        mod.verify()
         
-        target = llvm.Target.from_default_triple()
-        target_machine = target.create_target_machine()
-
-    
-        obj_code = target_machine.emit_object(mod)
-
-        with open(filename, "wb") as f:
-            f.write(obj_code)
+        with open(filename, "w") as f:
+            f.write(llvm_ir)
             
-        print(f"Native Object File saved to: {filename}")
+        print(f"LLVM IR text saved to: {filename}")
