@@ -292,6 +292,7 @@ class SemanticAnalyzer:
 
         iterable = self.visit(node.iterable)
 
+        # FIX: Allow raw "int" to be used as a loop limit
         if iterable == "int":
             self.symbol_table.declare(node.var, "int")
 
@@ -303,7 +304,7 @@ class SemanticAnalyzer:
 
         else:
             self.errors.add(SemanticError(f"Invalid iterable type: {iterable}"))
-            self.symbol_table.exit_scope() 
+            self.symbol_table.exit_scope() # Keep scope clean on error
             return
 
         for stmt in node.body:
@@ -380,6 +381,11 @@ class SemanticAnalyzer:
         self.errors.add(SemanticError(f"Function '{node.name}' not declared"))
         return None
         
+
+        
+        
+        
+
     
     def visit_array_literal(self, node):
         if not node.elements:

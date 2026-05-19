@@ -1,6 +1,5 @@
 import sys
 import os
-import subprocess
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 import platform
 from lexer import Lexer
@@ -45,19 +44,10 @@ def _try_load_lib_io():
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: cstar <file.cstar>     (Run instantly via JIT)")
-        print("       cstar -b <file.cstar>  (Build executable via AOT)")
+        print("Usage: python src/main.py <file.cstar>")
         sys.exit(1)
 
-    is_build_mode = False
-    if sys.argv[1] == "-b":
-        if len(sys.argv) < 3:
-            print("Error: Missing file path after -b")
-            sys.exit(1)
-        is_build_mode = True
-        file_path = sys.argv[2]
-    else:
-        file_path = sys.argv[1]
+    file_path = sys.argv[1]
     
     try:
         with open(file_path, 'r') as file:
@@ -133,37 +123,26 @@ def main():
     try:
         _try_load_lib_io()
 
-        if is_build_mode:
-            
-            os.makedirs("obj", exist_ok=True) 
-            base_name = os.path.splitext(os.path.basename(file_path))[0]
-            obj_path = os.path.join("obj", f"{base_name}{_native_object_extension()}")
-            
-            
-            codegen.save_object(obj_path)
-            
+        codegen.execute()
         
-            print("5. Linking executable...")
-            exe_name = f"{base_name}.exe" if platform.system() == "Windows" else base_name
-            exe_path = os.path.join("obj", exe_name)
-            
-            
-            try:
-                subprocess.run(["clang", obj_path, "-o", exe_path], check=True)
-                print(f"\n✅ Build Success! Standalone executable created at: {exe_path}")
-                print(f"You can now run it directly: .\\{exe_path}")
-            except Exception as e:
-                print(f"\n[Linker Error] Make sure you have a C compiler (clang or gcc) installed on your system.")
-                print(f"Details: {e}")
-                sys.exit(1)
-                
-        else:
-            
-            codegen.execute()
 
+        
+        os.makedirs("obj", exist_ok=True) 
+        
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        
+        obj_path = os.path.join("obj", f"{base_name}{_native_object_extension()}")
+        
+        codegen.save_object(obj_path)
+
+    
+        
     except Exception as e:
         print(f"[Runtime Error] {e}")
         sys.exit(1)
 
     print("Success! (Pipeline is completely wired up)")
+
+if __name__ == "__main__":
+    main()
 
