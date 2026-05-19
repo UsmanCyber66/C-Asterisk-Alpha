@@ -315,34 +315,66 @@ let x: int = 5  # inline comment
 
 ---
 
-## How to Run It
+## Installation & Getting Started
 
-### Prerequisites
+C* installs like any Python package and registers itself as a global command on your system. Three steps and you are writing compiled code.
 
-- Python 3.9+
-- `llvmlite` — `pip install llvmlite`
-- Optional: if you use `load_csv`, place a built native library in `src/`:
-  - **Linux / macOS:** `make -f Makefile.lib_io lib_io`
-  - **Windows:** compile `src/lib_io.c` to `lib_io.dll` (MSVC or MinGW, `-shared`).
-
-### Running a `.cstar` File
+### Step 1 — Clone the repository
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/cstar.git
-cd cstar
-
-# Compile and JIT-execute a .cstar program
-python src/main.py examples/hello.cstar
-
-# Run the logistic regression benchmark
-python src/main.py mnist_project/LR_mnist.cstar
-
-# Run the neural network benchmark
-python src/main.py mnist_project/nn_mnist.cstar
+git clone https://github.com/[YOUR-USERNAME]/c-star.git
+cd c-star
 ```
 
-The compiler prints each phase as it runs, displays the full AST, emits LLVM IR, JIT-executes the program, and saves a native object file to the `obj/` directory (`.obj` on Windows, `.o` on Linux and macOS).
+### Step 2 — Install the compiler
+
+```bash
+pip install .
+```
+
+That single command does everything. It installs `llvmlite` (the LLVM bindings) automatically as a dependency, and registers the `cstar` command globally on your system via the entry point defined in `setup.py`. After this, `cstar` is available in your terminal from any directory — no virtual environments, no path juggling, no `python src/main.py` wrappers.
+
+### Step 3 — Run your code anywhere
+
+```bash
+cstar hello.cstar
+```
+
+Done. You can now run any `.cstar` file from anywhere on your machine.
+
+---
+
+### Usage
+
+**JIT Execution — run instantly, no build step:**
+
+```bash
+cstar filename.cstar
+```
+
+The compiler runs the full pipeline (Lexer -> Parser -> Semantic Analyzer -> LLVM Codegen) and executes the result immediately in memory via LLVM's JIT engine. No intermediate files, no waiting. This is the default mode and what you will use most of the time.
+
+**AOT Compilation — build a standalone native executable:**
+
+```bash
+cstar -b filename.cstar
+```
+
+Instead of running in memory, this compiles your program to a native object file and links it into a standalone executable — `.exe` on Windows, a binary on Linux and macOS. The output is placed in the `obj/` directory. Once built, the executable runs with no Python dependency whatsoever.
+
+**Running the benchmarks:**
+
+```bash
+# Logistic regression — 1000 samples, 5 epochs
+cstar mnist_project/LR_mnist.cstar
+
+# Neural network — 400 -> 64 -> 1, 10 epochs
+cstar mnist_project/nn_mnist.cstar
+```
+
+---
+
+### What the compiler prints
 
 ```
 --- Compiling examples/hello.cstar ---
@@ -364,6 +396,13 @@ AST Generated Successfully
 4. Generating LLVM IR done.
 Success! (Pipeline is completely wired up)
 ```
+
+### Note on `load_csv`
+
+Programs that use the built-in `load_csv` function require the native C library to be present in `src/`:
+
+- **Linux / macOS:** `make -f Makefile.lib_io lib_io`
+- **Windows:** `lib_io.dll` is included in the repository pre-built. If you need to rebuild it: compile `src/lib_io.c` with MinGW or MSVC using the `-shared` flag.
 
 ---
 
