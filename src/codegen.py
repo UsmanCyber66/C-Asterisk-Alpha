@@ -29,6 +29,7 @@ class LLVMCodeGenerator:
 
         printf_ty = ir.FunctionType(self.i32, [self.i8_ptr], var_arg=True)
         self.printf = ir.Function(self.module, printf_ty, name="printf")
+
         exp_ty = ir.FunctionType(self.f64, [self.f64])
         self.exp_func = ir.Function(self.module, exp_ty, name="exp")
     
@@ -84,7 +85,7 @@ class LLVMCodeGenerator:
         for stmt in node.statements:
             self.visit(stmt)
 
-        if not self.builder.block.is_terminated:
+        if not self.builder.block.is_terminated:                          #auto return 0
             self.builder.ret(ir.Constant(self.i32, 0))
 
     # literals
@@ -102,8 +103,8 @@ class LLVMCodeGenerator:
         text = bytearray((node.value + "\0").encode())
 
         ty = ir.ArrayType(ir.IntType(8), len(text))
-        name = f"str_{len(self.module.globals)}"
 
+        name = f"str_{len(self.module.globals)}"
         glob = ir.GlobalVariable(self.module, ty, name=name)
         glob.global_constant = True
         glob.initializer = ir.Constant(ty, text)
@@ -144,13 +145,13 @@ class LLVMCodeGenerator:
         l = self.visit(node.left)
         r = self.visit(node.right)
 
+     #3+3.1
         if isinstance(l.type, ir.IntType) and isinstance(r.type, ir.DoubleType):
             l = self.builder.sitofp(l, ir.DoubleType())
         elif isinstance(l.type, ir.DoubleType) and isinstance(r.type, ir.IntType):
             r = self.builder.sitofp(r, ir.DoubleType())
-
+#glue
         is_float = isinstance(l.type, ir.DoubleType) or isinstance(r.type, ir.DoubleType)
-
         if isinstance(l.type, ir.PointerType) and getattr(l.type, 'pointee', None) == ir.IntType(8):
             
             if node.op == TokenType.PLUS:
@@ -218,10 +219,12 @@ class LLVMCodeGenerator:
         else:
             fmt = "%s\n\0"
 
-        fmt_ptr = self._fmt(fmt)
+        fmt_ptr = self._fmt(fmt) #creat glovar
+
         self.builder.call(self.printf, [fmt_ptr, val])
 
-    def _fmt(self, s):
+
+    def _fmt(self, s):                     #worrd count
         data = bytearray(s.encode())
         ty = ir.ArrayType(ir.IntType(8), len(data))
 
@@ -234,13 +237,13 @@ class LLVMCodeGenerator:
     #flow
     def visit_If(self, node):
         cond = self.visit(node.condition)
-        cond = self.builder.icmp_signed("!=", cond, self.i32(0))
+        cond = self.builder.icmp_signed("!=", cond, self.i32(0))  #if 0=false ifnot=tr
 
         then_bb = self.builder.append_basic_block("then")
         else_bb = self.builder.append_basic_block("else") if node.else_body else None
         end_bb = self.builder.append_basic_block("end")
 
-        self.builder.cbranch(cond, then_bb, else_bb or end_bb)
+        self.builder.cbranch(cond, then_bb, else_bb or end_bb)  #go to then or else ?
 
         self.builder.position_at_end(then_bb)
         for s in node.body:
@@ -308,7 +311,7 @@ class LLVMCodeGenerator:
             if p["name"] == "self":
                 self.variables[p["name"]] = func.args[i]
             elif p["type"] in ("[float]", "[int]"):
-                # Array params are already pointers — store directly, no alloca
+                # Array params are already pointers store directly no alloca
                 self.variables[p["name"]] = func.args[i]
             else:
                 ptr = self.builder.alloca(param_types[i], name=p["name"])
@@ -328,24 +331,24 @@ class LLVMCodeGenerator:
         self.builder.ret(self.visit(node.value))
 
 
- #calls
+ #calls(oop)
     def visit_Call(self, node):
         
-        if getattr(node, "object", None) is not None:
+        if getattr(node, "object", None) is not None:       #split parser    exp model.train obj mod  call train
             obj_ptr = self.variables[node.object.name]
-            class_name = obj_ptr.type.pointee.name
+            class_name = obj_ptr.type.pointee.name                 
             
             func_name = f"{class_name}_{node.name}"
             func = self.module.globals.get(func_name)
             
             args = [obj_ptr] + [self.visit(a) for a in node.args]
-            return self.builder.call(func, args)
+            return self.builder.call(func, args)                    #so class x / model.train = x.train /then transfer user inp . neet
         
         # handle load_csv built in function
         if node.name == "load_csv":
             filename = self.visit(node.args[0])
             num_values = self.visit(node.args[1])
-            return self.builder.call(self.load_csv_func, [filename, num_values])
+            return self.builder.call(self.load_csv_func, [filename, num_values])         #god bless c
 
         if node.name in self.classes:
             class_info = self.classes[node.name]
@@ -354,7 +357,7 @@ class LLVMCodeGenerator:
             for i, default_node in enumerate(class_info["defaults"]):
                 if default_node: 
                     val = self.visit(default_node) 
-                    field_ptr = self.builder.gep(ptr, [self.i32(0), self.i32(i)], inbounds=True)
+                    field_ptr = self.builder.gep(ptr, [self.i32(0), self.i32(i)], inbounds=True)  #asign values for the class
                     
                     
                     if isinstance(val.type, ir.ArrayType) and isinstance(field_ptr.type.pointee, ir.PointerType):
@@ -372,7 +375,7 @@ class LLVMCodeGenerator:
                     
                     self.builder.store(val, field_ptr) 
             
-            return self.builder.load(ptr)
+            return self.builder.load(ptr)  # heap maloc 
 
         
         if node.name == "len":
@@ -383,7 +386,7 @@ class LLVMCodeGenerator:
                 length = arg.type.pointee.count
             else:
                 length = 0 
-            return ir.Constant(self.i32, length)
+            return ir.Constant(self.i32, length)  #we know size before running
 
         
         if node.name in ["exp", "sqrt", "log"]:
@@ -418,9 +421,9 @@ class LLVMCodeGenerator:
     
     def visit_MemberAccess(self, node):
         """Pulls a specific field out of an object (e.g. obj.field)."""
-        obj_ptr = self.variables[node.object.name]
+        obj_ptr= self.variables[node.object.name]
         class_name = obj_ptr.type.pointee.name
-        
+         
         field_idx = self.classes[class_name]["indices"][node.member]
         
         ptr = self.builder.gep(obj_ptr, [self.i32(0), self.i32(field_idx)], inbounds=True)
@@ -435,7 +438,7 @@ class LLVMCodeGenerator:
         
         if hasattr(iterable_val.type, "pointee") and isinstance(iterable_val.type.pointee, ir.ArrayType):
             is_array = True
-            limit_val = ir.Constant(self.i32, iterable_val.type.pointee.count)
+            limit_val = ir.Constant(self.i32, iterable_val.type.pointee.count)   # see the limit set for an array 
         elif isinstance(iterable_val.type, ir.ArrayType):
             is_array = True
             limit_val = ir.Constant(self.i32, iterable_val.type.count)
@@ -486,14 +489,14 @@ class LLVMCodeGenerator:
         """Recursively finds the exact memory address for variables, class fields, and chained array indices."""
         if type(node).__name__ == "Variable":
             var = self.variables[node.name]
-            # If the variable IS a raw pointer (e.g. [float] param), return it directly
+    
             if isinstance(var.type, ir.PointerType) and not isinstance(var.type.pointee, ir.PointerType):
-                # Check it's not a struct pointer (class instance)
+                
                 if not hasattr(var.type.pointee, 'name'):
                     return var
             return var
             
-        elif type(node).__name__ == "MemberAccess":
+        elif type(node).__name__ == "MemberAccess":               #edit
             obj_ptr = self.variables[node.object.name]
             class_name = obj_ptr.type.pointee.name
             field_idx = self.classes[class_name]["indices"][node.member]
@@ -506,13 +509,13 @@ class LLVMCodeGenerator:
             if isinstance(base_ptr.type, ir.PointerType):
                 pointee = base_ptr.type.pointee
                 if isinstance(pointee, ir.PointerType):
-                    # double pointer: load first then gep
+                    
                     actual_ptr = self.builder.load(base_ptr)
                     return self.builder.gep(actual_ptr, [idx], inbounds=True)
                 elif isinstance(pointee, ir.ArrayType):
                     return self.builder.gep(base_ptr, [self.i32(0), idx], inbounds=True)
                 else:
-                    # raw pointer (float* from load_csv or array param)
+                   
                     return self.builder.gep(base_ptr, [idx], inbounds=True)
             
         raise Exception(f"Cannot get pointer for {type(node).__name__}")
@@ -520,7 +523,7 @@ class LLVMCodeGenerator:
     def visit_ArrayIndex(self, node):
         """Pulls a value out of an array at a specific index."""
        
-        ptr = self.get_ptr(node)
+        ptr = self.get_ptr(node)      #heap? stack?
         return self.builder.load(ptr) 
 
 
@@ -643,7 +646,7 @@ class LLVMCodeGenerator:
         if all(isinstance(val, ir.Constant) for val in elements):
             return ir.Constant(arr_ty, elements)
         
-        # Build array dynamically on the stack 
+        
         tmp_ptr = self.builder.alloca(arr_ty, name="arr_literal_tmp")
         for i, val in enumerate(elements):
             idx = ir.Constant(self.i32, i)
@@ -678,7 +681,6 @@ class LLVMCodeGenerator:
             
             func_ptr = ee.get_function_address("main")
             
-           
             from ctypes import CFUNCTYPE, c_int
             import time  
             
@@ -692,7 +694,8 @@ class LLVMCodeGenerator:
             
             print(f"--- Program Exited with code {result} ---")
             print(f".cstar took: {end_time - start_time:.6f} seconds")
-            return result
+            return result      
+     
     
     #testing something 
 

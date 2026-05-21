@@ -37,7 +37,7 @@ func loadFlatCSV(path string, count int, hasHeader bool) []float64 {
 	scanner.Buffer(make([]byte, 1024*1024*64), 1024*1024*64)
 
 	if hasHeader {
-		scanner.Scan() // skip header row
+		scanner.Scan() 
 	}
 
 	for scanner.Scan() && len(data) < count {
@@ -76,7 +76,7 @@ func main() {
 	fmt.Println("Loading dataset and weights...")
 	loadStart := time.Now()
 
-	// flat: data[i*401 + p] = pixel p,  data[i*401 + 400] = label
+	
 	data := loadFlatCSV(
 		"mnist_project/data/Mnist_Binary_0_vs_1_1000_20x20.csv",
 		numSamples*(numPixels+1), true)
@@ -105,7 +105,6 @@ func main() {
 		for i := 0; i < numSamples; i++ {
 			base := i * (numPixels + 1)
 
-			// ── FORWARD PASS ──────────────────
 			for h := 0; h < hidden; h++ {
 				z := b1[h]
 				for p := 0; p < numPixels; p++ {
@@ -123,7 +122,7 @@ func main() {
 			label := data[base+numPixels]
 			dA2   := a2 - label
 
-			// ── BACKWARD PASS ─────────────────
+			
 			for h := 0; h < hidden; h++ {
 				W2[h] -= lr * dA2 * a1Cache[h]
 			}

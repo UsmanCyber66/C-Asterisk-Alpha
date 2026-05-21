@@ -95,7 +95,7 @@ int main() {
         for (int i = 0; i < NUM_SAMPLES; i++) {
             int base = i * (NUM_PIXELS + 1);
 
-            // ── FORWARD PASS ──────────────────
+        
             for (int h = 0; h < HIDDEN; h++) {
                 double z = b1[h];
                 for (int p = 0; p < NUM_PIXELS; p++)
@@ -111,7 +111,7 @@ int main() {
             double label = data[base + NUM_PIXELS];
             double d_a2  = a2 - label;
 
-            // ── BACKWARD PASS ─────────────────
+            
             for (int h = 0; h < HIDDEN; h++)
                 W2[h] -= LR * d_a2 * a1_cache[h];
             b2[0] -= LR * d_a2;
